@@ -1,5 +1,5 @@
 --// AUTO FARM UI (MINIMIZABLE)
---// AUTO SKILLS + ACCURATE AUTO REPLAY
+--// AUTO SKILLS + ACCURATE AUTO REPLAY + AUTO UPGRADE
 --// Put in LocalScript
 
 local Players = game:GetService("Players")
@@ -15,6 +15,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local autoSkills = false
 local autoReplay = false
+local autoUpgrade = false
 local minimized = false
 
 --------------------------------------------------
@@ -27,7 +28,7 @@ gui.ResetOnSpawn = false
 gui.Parent = playerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 250, 0, 190)
+frame.Size = UDim2.new(0, 250, 0, 250)
 frame.Position = UDim2.new(0.75, 0, 0.2, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.BorderSizePixel = 0
@@ -95,8 +96,9 @@ local function createButton(text, posY)
 	return btn
 end
 
-local skillsBtn = createButton("Auto Skills: OFF", 55)
-local replayBtn = createButton("Auto Replay: OFF", 115)
+local skillsBtn  = createButton("Auto Skills: OFF",  55)
+local replayBtn  = createButton("Auto Replay: OFF",  110)
+local upgradeBtn = createButton("Auto Upgrade: OFF", 165)
 
 --------------------------------------------------
 -- MINIMIZE
@@ -108,19 +110,21 @@ minimizeBtn.MouseButton1Click:Connect(function()
 
 	if minimized then
 
-		frame.Size = UDim2.new(0,250,0,45)
+		frame.Size = UDim2.new(0, 250, 0, 45)
 
-		skillsBtn.Visible = false
-		replayBtn.Visible = false
+		skillsBtn.Visible  = false
+		replayBtn.Visible  = false
+		upgradeBtn.Visible = false
 
 		minimizeBtn.Text = "+"
 
 	else
 
-		frame.Size = UDim2.new(0,250,0,190)
+		frame.Size = UDim2.new(0, 250, 0, 250)
 
-		skillsBtn.Visible = true
-		replayBtn.Visible = true
+		skillsBtn.Visible  = true
+		replayBtn.Visible  = true
+		upgradeBtn.Visible = true
 
 		minimizeBtn.Text = "-"
 	end
@@ -153,6 +157,19 @@ replayBtn.MouseButton1Click:Connect(function()
 	else
 		replayBtn.Text = "Auto Replay: OFF"
 		replayBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+	end
+end)
+
+upgradeBtn.MouseButton1Click:Connect(function()
+
+	autoUpgrade = not autoUpgrade
+
+	if autoUpgrade then
+		upgradeBtn.Text = "Auto Upgrade: ON"
+		upgradeBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
+	else
+		upgradeBtn.Text = "Auto Upgrade: OFF"
+		upgradeBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
 	end
 end)
 
@@ -193,7 +210,7 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- ACCURATE AUTO REPLAY (FIXED)
+-- ACCURATE AUTO REPLAY + AUTO UPGRADE (FIXED)
 --------------------------------------------------
 
 task.spawn(function()
@@ -203,36 +220,81 @@ task.spawn(function()
 
 		if autoReplay then
 
+			-- HANDLE UPGRADE/EVOLUTION SCREEN (only if autoUpgrade is ON)
+			if autoUpgrade then
+
+				for _, v in pairs(playerGui:GetDescendants()) do
+
+					if (v:IsA("TextButton") or v:IsA("ImageButton")) and v.Visible then
+
+						local isUpgrade = false
+
+						pcall(function()
+							if string.find(string.lower(v.Name), "upgrade")
+							or string.find(string.lower(v.Name), "chance")
+							or string.find(string.lower(v.Name), "dice")
+							or string.find(string.lower(v.Name), "roll") then
+								isUpgrade = true
+							end
+						end)
+
+						for _, child in pairs(v:GetDescendants()) do
+							if child:IsA("TextLabel") then
+								local t = string.lower(child.Text)
+								if string.find(t, "upgrade") or string.find(t, "chance") then
+									isUpgrade = true
+								end
+							end
+						end
+
+						if isUpgrade then
+
+							local inset = GuiService:GetGuiInset()
+							local pos = v.AbsolutePosition
+							local size = v.AbsoluteSize
+							local x = pos.X + (size.X / 2)
+							local y = pos.Y + (size.Y / 2) + inset.Y
+
+							for i = 1, 6 do
+								VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+								task.wait(0.05)
+								VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+								task.wait(0.3)
+							end
+
+							print("Upgrade screen handled!")
+							task.wait(1.5)
+							break
+						end
+					end
+				end
+			end
+
+			-- HANDLE REPLAY BUTTON
 			for _, v in pairs(playerGui:GetDescendants()) do
 
 				if (v:IsA("TextButton") or v:IsA("ImageButton")) and v.Visible then
 
 					local replayFound = false
 
-					-- Check button name
 					if string.find(string.lower(v.Name), "replay") then
 						replayFound = true
 					end
 
-					-- Check button text
 					pcall(function()
 						if string.find(string.lower(v.Text), "replay") then
 							replayFound = true
 						end
 					end)
 
-					-- Check children textlabels
 					for _, child in pairs(v:GetDescendants()) do
-
 						if child:IsA("TextLabel") then
-
 							if string.find(string.lower(child.Text), "replay") then
 								replayFound = true
 							end
 						end
 					end
 
-					-- CLICK WITH INSET CORRECTION
 					if replayFound then
 
 						local inset = GuiService:GetGuiInset()

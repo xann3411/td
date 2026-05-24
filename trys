@@ -193,7 +193,7 @@ end
 task.spawn(function()
 
 	while true do
-		task.wait(0.5)
+		task.wait(0.1)
 
 		if autoSkills then
 
@@ -216,7 +216,7 @@ end)
 task.spawn(function()
 
 	while true do
-		task.wait(0.5)
+		task.wait(0)
 
 		if autoReplay then
 
@@ -263,7 +263,7 @@ task.spawn(function()
 							end
 
 							print("Upgrade screen handled!")
-							task.wait(0.8)
+							task.wait(0.3)
 							break
 						end
 					end
@@ -309,7 +309,7 @@ task.spawn(function()
 						VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
 
 						print("Replay clicked!")
-						task.wait(0.7)
+						task.wait(0.3)
 						break
 					end
 				end

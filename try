@@ -1,0 +1,143 @@
+--// AUTO SKILL + AUTO REPLAY UI
+--// Put in LocalScript
+
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- STATES
+local autoSkills = false
+local autoReplay = false
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoFarmUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = playerGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 220, 0, 140)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -70)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0,10)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0,35)
+Title.BackgroundTransparency = 1
+Title.Text = "AUTO FARM PANEL"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Parent = MainFrame
+
+-- BUTTON CREATOR
+local function createButton(text, posY)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0.85,0,0,35)
+	btn.Position = UDim2.new(0.075,0,0,posY)
+	btn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 15
+	btn.Text = text
+	btn.Parent = MainFrame
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0,8)
+	corner.Parent = btn
+
+	return btn
+end
+
+local SkillButton = createButton("Auto Skills: OFF", 45)
+local ReplayButton = createButton("Auto Replay: OFF", 90)
+
+-- TOGGLE BUTTONS
+SkillButton.MouseButton1Click:Connect(function()
+	autoSkills = not autoSkills
+
+	if autoSkills then
+		SkillButton.Text = "Auto Skills: ON"
+		SkillButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
+	else
+		SkillButton.Text = "Auto Skills: OFF"
+		SkillButton.BackgroundColor3 = Color3.fromRGB(45,45,45)
+	end
+end)
+
+ReplayButton.MouseButton1Click:Connect(function()
+	autoReplay = not autoReplay
+
+	if autoReplay then
+		ReplayButton.Text = "Auto Replay: ON"
+		ReplayButton.BackgroundColor3 = Color3.fromRGB(0,170,0)
+	else
+		ReplayButton.Text = "Auto Replay: OFF"
+		ReplayButton.BackgroundColor3 = Color3.fromRGB(45,45,45)
+	end
+end)
+
+-- KEY PRESS FUNCTION
+local function pressKey(key)
+	VirtualInputManager:SendKeyEvent(true, key, false, game)
+	task.wait(0.05)
+	VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+-- AUTO SKILLS LOOP
+task.spawn(function()
+	while true do
+		task.wait(0.2)
+
+		if autoSkills then
+			pressKey(Enum.KeyCode.One)
+			task.wait(0.15)
+
+			pressKey(Enum.KeyCode.Two)
+			task.wait(0.15)
+
+			pressKey(Enum.KeyCode.Three)
+			task.wait(0.15)
+
+			pressKey(Enum.KeyCode.Four)
+			task.wait(0.15)
+
+			pressKey(Enum.KeyCode.Five)
+		end
+	end
+end)
+
+-- AUTO REPLAY LOOP
+task.spawn(function()
+	while true do
+		task.wait(1)
+
+		if autoReplay then
+			for _, gui in pairs(playerGui:GetDescendants()) do
+				if gui:IsA("TextButton") or gui:IsA("ImageButton") then
+					local nameLower = string.lower(gui.Name)
+					local textLower = ""
+
+					pcall(function()
+						textLower = string.lower(gui.Text)
+					end)
+
+					if string.find(nameLower, "replay") or string.find(textLower, "replay") then
+						if gui.Visible then
+							gui:Activate()
+						end
+					end
+				end
+			end
+		end
+	end
+end)

@@ -1,4 +1,4 @@
---// AUTO FARM UI + AUTO SKILLS + WORKING AUTO REPLAY
+--// AUTO FARM UI (MINIMIZABLE)
 --// Put in LocalScript
 
 local Players = game:GetService("Players")
@@ -13,6 +13,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local autoSkills = false
 local autoReplay = false
+local minimized = false
 
 --------------------------------------------------
 -- GUI
@@ -24,7 +25,7 @@ gui.ResetOnSpawn = false
 gui.Parent = playerGui
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 240, 0, 160)
+frame.Size = UDim2.new(0, 250, 0, 190)
 frame.Position = UDim2.new(0.75, 0, 0.2, 0)
 frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 frame.BorderSizePixel = 0
@@ -36,14 +37,38 @@ local frameCorner = Instance.new("UICorner")
 frameCorner.CornerRadius = UDim.new(0,12)
 frameCorner.Parent = frame
 
+--------------------------------------------------
+-- TITLE
+--------------------------------------------------
+
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1,0,0,40)
+title.Size = UDim2.new(1, -40, 0, 40)
+title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
 title.Text = "AUTO FARM PANEL"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 20
+title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = frame
+
+--------------------------------------------------
+-- MINIMIZE BUTTON
+--------------------------------------------------
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -35, 0, 5)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+minimizeBtn.Text = "-"
+minimizeBtn.TextColor3 = Color3.new(1,1,1)
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 22
+minimizeBtn.Parent = frame
+
+local minCorner = Instance.new("UICorner")
+minCorner.CornerRadius = UDim.new(0,8)
+minCorner.Parent = minimizeBtn
 
 --------------------------------------------------
 -- BUTTON CREATOR
@@ -67,14 +92,40 @@ local function createButton(text, posY)
 	return btn
 end
 
-local skillsBtn = createButton("Auto Skills: OFF", 50)
-local replayBtn = createButton("Auto Replay: OFF", 105)
+local skillsBtn = createButton("Auto Skills: OFF", 55)
+local replayBtn = createButton("Auto Replay: OFF", 115)
+
+--------------------------------------------------
+-- MINIMIZE FUNCTION
+--------------------------------------------------
+
+minimizeBtn.MouseButton1Click:Connect(function()
+
+	minimized = not minimized
+
+	if minimized then
+		frame.Size = UDim2.new(0, 250, 0, 45)
+
+		skillsBtn.Visible = false
+		replayBtn.Visible = false
+
+		minimizeBtn.Text = "+"
+	else
+		frame.Size = UDim2.new(0, 250, 0, 190)
+
+		skillsBtn.Visible = true
+		replayBtn.Visible = true
+
+		minimizeBtn.Text = "-"
+	end
+end)
 
 --------------------------------------------------
 -- TOGGLES
 --------------------------------------------------
 
 skillsBtn.MouseButton1Click:Connect(function()
+
 	autoSkills = not autoSkills
 
 	if autoSkills then
@@ -87,6 +138,7 @@ skillsBtn.MouseButton1Click:Connect(function()
 end)
 
 replayBtn.MouseButton1Click:Connect(function()
+
 	autoReplay = not autoReplay
 
 	if autoReplay then
@@ -110,14 +162,15 @@ end
 
 --------------------------------------------------
 -- AUTO SKILLS
--- Rapid spam every 3 seconds
 --------------------------------------------------
 
 task.spawn(function()
+
 	while true do
-		task.wait(1)
+		task.wait(3)
 
 		if autoSkills then
+
 			for i = 1, 5 do
 				pressKey(Enum.KeyCode.One)
 				pressKey(Enum.KeyCode.Two)
@@ -130,17 +183,18 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- WORKING AUTO REPLAY
+-- AUTO REPLAY
 --------------------------------------------------
 
 task.spawn(function()
+
 	while true do
 		task.wait(0.3)
 
 		if autoReplay then
+
 			for _, v in pairs(playerGui:GetDescendants()) do
 
-				-- Find replay text
 				if v:IsA("TextLabel") or v:IsA("TextButton") then
 
 					local success, txt = pcall(function()
@@ -153,15 +207,14 @@ task.spawn(function()
 
 						if target and target:IsA("GuiObject") and target.Visible then
 
-							-- Get button center position
 							local absPos = target.AbsolutePosition
 							local absSize = target.AbsoluteSize
 
 							local x = absPos.X + (absSize.X / 2)
 							local y = absPos.Y + (absSize.Y / 2)
 
-							-- Spam click replay
 							for i = 1, 8 do
+
 								VirtualInputManager:SendMouseButtonEvent(
 									x,
 									y,
@@ -181,112 +234,6 @@ task.spawn(function()
 									game,
 									1
 								)
-
-								task.wait(0.1)
-							end
-
-							print("Replay clicked!")
-						end
-					end
-				end
-			end
-		end
-	end
-end)	if autoSkills then
-		skillsBtn.Text = "Auto Skills: ON"
-		skillsBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
-	else
-		skillsBtn.Text = "Auto Skills: OFF"
-		skillsBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
-	end
-end)
-
-replayBtn.MouseButton1Click:Connect(function()
-	autoReplay = not autoReplay
-
-	if autoReplay then
-		replayBtn.Text = "Auto Replay: ON"
-		replayBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
-	else
-		replayBtn.Text = "Auto Replay: OFF"
-		replayBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
-	end
-end)
-
---------------------------------------------------
--- KEY PRESS FUNCTION
---------------------------------------------------
-
-local function pressKey(key)
-	VirtualInputManager:SendKeyEvent(true, key, false, game)
-	task.wait(0.03)
-	VirtualInputManager:SendKeyEvent(false, key, false, game)
-end
-
---------------------------------------------------
--- AUTO SKILLS
--- Rapidly presses 1-5 every 3 seconds
---------------------------------------------------
-
-task.spawn(function()
-	while true do
-		task.wait(3)
-
-		if autoSkills then
-			for i = 1, 5 do
-				pressKey(Enum.KeyCode.One)
-				pressKey(Enum.KeyCode.Two)
-				pressKey(Enum.KeyCode.Three)
-				pressKey(Enum.KeyCode.Four)
-				pressKey(Enum.KeyCode.Five)
-			end
-		end
-	end
-end)
-
---------------------------------------------------
--- BETTER AUTO REPLAY
---------------------------------------------------
-
-task.spawn(function()
-	while true do
-		task.wait(0.5)
-
-		if autoReplay then
-			for _, v in pairs(playerGui:GetDescendants()) do
-
-				-- Finds Replay text
-				if v:IsA("TextLabel") then
-
-					local text = string.lower(v.Text)
-
-					if string.find(text, "replay") then
-
-						local parent = v.Parent
-
-						if parent then
-
-							-- Click parent button
-							pcall(function()
-								if parent:IsA("TextButton") or parent:IsA("ImageButton") then
-									parent:Activate()
-								end
-							end)
-
-							-- Click sibling buttons too
-							for _, obj in pairs(parent:GetChildren()) do
-								if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-									pcall(function()
-										obj:Activate()
-									end)
-								end
-							end
-
-							-- Extra spam clicking
-							for i = 1, 5 do
-								pcall(function()
-									parent:Activate()
-								end)
 
 								task.wait(0.1)
 							end

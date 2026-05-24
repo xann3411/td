@@ -193,7 +193,7 @@ end
 task.spawn(function()
 
 	while true do
-		task.wait(3)
+		task.wait(0.5)
 
 		if autoSkills then
 
@@ -263,7 +263,7 @@ task.spawn(function()
 							end
 
 							print("Upgrade screen handled!")
-							task.wait(1.5)
+							task.wait(0.8)
 							break
 						end
 					end

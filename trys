@@ -216,7 +216,7 @@ end)
 task.spawn(function()
 
 	while true do
-		task.wait(1)
+		task.wait(0.5)
 
 		if autoReplay then
 
@@ -309,7 +309,7 @@ task.spawn(function()
 						VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
 
 						print("Replay clicked!")
-						task.wait(2)
+						task.wait(0.7)
 						break
 					end
 				end

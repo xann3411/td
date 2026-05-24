@@ -1,4 +1,5 @@
 --// AUTO FARM UI (MINIMIZABLE)
+--// AUTO SKILLS + ACCURATE AUTO REPLAY
 --// Put in LocalScript
 
 local Players = game:GetService("Players")
@@ -75,6 +76,7 @@ minCorner.Parent = minimizeBtn
 --------------------------------------------------
 
 local function createButton(text, posY)
+
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(0.85,0,0,45)
 	btn.Position = UDim2.new(0.075,0,0,posY)
@@ -96,7 +98,7 @@ local skillsBtn = createButton("Auto Skills: OFF", 55)
 local replayBtn = createButton("Auto Replay: OFF", 115)
 
 --------------------------------------------------
--- MINIMIZE FUNCTION
+-- MINIMIZE
 --------------------------------------------------
 
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -104,14 +106,17 @@ minimizeBtn.MouseButton1Click:Connect(function()
 	minimized = not minimized
 
 	if minimized then
-		frame.Size = UDim2.new(0, 250, 0, 45)
+
+		frame.Size = UDim2.new(0,250,0,45)
 
 		skillsBtn.Visible = false
 		replayBtn.Visible = false
 
 		minimizeBtn.Text = "+"
+
 	else
-		frame.Size = UDim2.new(0, 250, 0, 190)
+
+		frame.Size = UDim2.new(0,250,0,190)
 
 		skillsBtn.Visible = true
 		replayBtn.Visible = true
@@ -155,8 +160,11 @@ end)
 --------------------------------------------------
 
 local function pressKey(key)
+
 	VirtualInputManager:SendKeyEvent(true, key, false, game)
+
 	task.wait(0.03)
+
 	VirtualInputManager:SendKeyEvent(false, key, false, game)
 end
 
@@ -172,6 +180,7 @@ task.spawn(function()
 		if autoSkills then
 
 			for i = 1, 5 do
+
 				pressKey(Enum.KeyCode.One)
 				pressKey(Enum.KeyCode.Two)
 				pressKey(Enum.KeyCode.Three)
@@ -183,61 +192,80 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- AUTO REPLAY
+-- ACCURATE AUTO REPLAY
 --------------------------------------------------
 
 task.spawn(function()
 
 	while true do
-		task.wait(0.3)
+		task.wait(0.2)
 
 		if autoReplay then
 
 			for _, v in pairs(playerGui:GetDescendants()) do
 
-				if v:IsA("TextLabel") or v:IsA("TextButton") then
+				if v:IsA("TextButton") or v:IsA("ImageButton") then
 
-					local success, txt = pcall(function()
-						return string.lower(v.Text)
+					local replayFound = false
+
+					-- Check button name
+					if string.find(string.lower(v.Name), "replay") then
+						replayFound = true
+					end
+
+					-- Check button text
+					pcall(function()
+						if string.find(string.lower(v.Text), "replay") then
+							replayFound = true
+						end
 					end)
 
-					if success and string.find(txt, "replay") then
+					-- Check children textlabels
+					for _, child in pairs(v:GetDescendants()) do
 
-						local target = v.Parent
+						if child:IsA("TextLabel") then
 
-						if target and target:IsA("GuiObject") and target.Visible then
-
-							local absPos = target.AbsolutePosition
-							local absSize = target.AbsoluteSize
-
-							local x = absPos.X + (absSize.X / 2)
-							local y = absPos.Y + (absSize.Y / 2)
-
-							for i = 1, 8 do
-
-								VirtualInputManager:SendMouseButtonEvent(
-									x,
-									y,
-									0,
-									true,
-									game,
-									1
-								)
-
-								task.wait(0.05)
-
-								VirtualInputManager:SendMouseButtonEvent(
-									x,
-									y,
-									0,
-									false,
-									game,
-									1
-								)
-
-								task.wait(0.1)
+							if string.find(string.lower(child.Text), "replay") then
+								replayFound = true
 							end
 						end
+					end
+
+					-- CLICK ACTUAL BUTTON
+					if replayFound and v.Visible then
+
+						local pos = v.AbsolutePosition
+						local size = v.AbsoluteSize
+
+						local x = pos.X + (size.X / 2)
+						local y = pos.Y + (size.Y / 2)
+
+						for i = 1, 10 do
+
+							VirtualInputManager:SendMouseButtonEvent(
+								x,
+								y,
+								0,
+								true,
+								game,
+								1
+							)
+
+							task.wait(0.03)
+
+							VirtualInputManager:SendMouseButtonEvent(
+								x,
+								y,
+								0,
+								false,
+								game,
+								1
+							)
+
+							task.wait(0.05)
+						end
+
+						print("Replay clicked accurately!")
 					end
 				end
 			end

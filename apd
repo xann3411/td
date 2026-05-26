@@ -278,9 +278,7 @@ end
 -- Rayfield UI
 -- ================================================
 local Rayfield = loadstring(game:HttpGet(
-'
-https://raw.githubusercontent.com/KarmaPanda/Roblox/refs/heads/main/rayfield.lua
-'))()
+'https://raw.githubusercontent.com/xann3411/td/refs/heads/main/rayfield.lua.txt'))()
 
 local Window = Rayfield:CreateWindow({
 Name = "Anime Power Defense Script",
@@ -525,7 +523,7 @@ Save()
 if value and not _G.apd_auto_executed then
 _G.apd_auto_executed = true
 -- Replace the URL below with wherever you host this script
-queue_on_teleport(game:HttpGet("YOUR_SCRIPT_URL_HERE"))
+queue_on_teleport(game:HttpGet("https://raw.githubusercontent.com/xann3411/td/refs/heads/main/apd"))
 end
 end,
 SectionParent = MiscSection

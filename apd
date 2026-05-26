@@ -1,0 +1,578 @@
+ATD Macro Script
+-- Anime Power Defense (APD) Auto Farm Script
+-- GameId: 5787561793
+-- ================================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+if game.GameId ~= 5787561793 then return end
+
+-- ================================================
+-- Services
+-- ================================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+
+-- ================================================
+-- Remotes
+-- ================================================
+local GameEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Game")
+
+local RF = ReplicatedStorage
+:WaitForChild("Modules")
+:WaitForChild("Packages")
+:WaitForChild("Knit")
+:WaitForChild("Services")
+:WaitForChild("GameService")
+:WaitForChild("RF")
+
+local GetPlacedUnitsRF = RF:WaitForChild("GetPlacedUnits")
+local VoteSkipWaveRF = RF:WaitForChild("VoteSkipWave")
+local SellUnitRF = RF:WaitForChild("SellUnit")
+local SetGamespeedRF = RF:WaitForChild("SetGamespeed")
+local GetAOERF = RF:WaitForChild("GetAOE")
+
+-- ================================================
+-- Remote Wrappers
+-- ================================================
+
+-- Returns table keyed by GUID:
+-- [guid] = {
+-- Type = unitId (number),
+-- Index = guid (string),
+-- UnitModelName = guid (string),
+-- InventoryId = "unitId#uuid" (string), <-- use as equipString for PlaceUnit
+-- UnitInventoryData = { id, exp, level, trait, ... },
+-- Info = { ["unitId"] = { Upgrade = n, Data = { upgrades = [...] } } }
+-- }
+local function GetPlacedUnits()
+return GetPlacedUnitsRF:InvokeServer()
+end
+
+-- Place a unit on the map
+-- unitId: number (e.g. 92)
+-- cf: CFrame
+-- equipString: "unitId#uuid" from InventoryId
+local function PlaceUnit(unitId, cf, equipString)
+GameEvent:FireServer("PlaceUnit", unitId, cf, equipString)
+end
+
+-- Upgrade a placed unit by its GUID
+local function UpgradeUnit(guid)
+GameEvent:FireServer("UpgradeUnit", guid)
+end
+
+-- Sell a placed unit by its GUID
+local function SellUnit(guid)
+SellUnitRF:InvokeServer(guid)
+end
+
+-- Vote to skip the current wave
+local function VoteSkipWave()
+VoteSkipWaveRF:InvokeServer()
+end
+
+-- Set game speed (1 = normal, 1.5 = fast, 2 = max)
+local function SetGamespeed(speed)
+SetGamespeedRF:InvokeServer(speed)
+end
+
+-- Replay / retry the game
+local function Replay()
+GameEvent:FireServer("Retry")
+end
+
+-- Get valid placement CFrames from workspace (hill + ground spots)
+-- Returns a list of CFrames for all placeable spots on the map
+local function GetPlacementSpots()
+local spots = {}
+for _, v in pairs(workspace:GetDescendants()) do
+if v:IsA("BasePart") or v:IsA("MeshPart") or v:IsA("SpecialMesh") then
+local name = v.Name:lower()
+if name:find("hill") or name:find("ground") or name:find("spot")
+or name:find("place") or name:find("slot") or name:find("pad")
+or name:find("tower") or name:find("platform") then
+table.insert(spots, v.CFrame)
+end
+end
+end
+return spots
+end
+
+-- ================================================
+-- Folder + Settings
+-- ================================================
+if not isfolder("KarmaPanda") then makefolder("KarmaPanda") end
+if not isfolder("KarmaPanda\\APD") then makefolder("KarmaPanda\\APD") end
+if not isfolder("KarmaPanda\\APD\\Settings") then makefolder("KarmaPanda\\APD\\Settings") end
+
+local SettingsFile = "KarmaPanda\\APD\\Settings\\" .. Player.UserId .. ".json"
+
+local DefaultSettings = {
+auto_place = false,
+auto_upgrade = false,
+auto_sell = false,
+auto_skip_wave = false,
+auto_replay = false,
+auto_gamespeed = false,
+gamespeed = 1.5,
+upgrade_delay = 0.5,
+place_delay = 0.5,
+skip_delay = 3,
+auto_execute = false,
+}
+
+local Settings = {}
+for k, v in pairs(DefaultSettings) do Settings[k] = v end
+
+local function Save()
+writefile(SettingsFile, HttpService:JSONEncode(Settings))
+end
+
+local function Load()
+if isfile(SettingsFile) then
+local ok, data = pcall(function()
+return HttpService:JSONDecode(readfile(SettingsFile))
+end)
+if ok and data then
+for k, v in pairs(data) do Settings[k] = v end
+end
+end
+end
+
+Load()
+
+-- ================================================
+-- Loop State
+-- ================================================
+local Loops = {
+auto_upgrade = false,
+auto_skip_wave = false,
+auto_replay = false,
+auto_place = false,
+}
+
+-- ================================================
+-- Core Logic
+-- ================================================
+
+-- Auto Upgrade: loops all placed units and upgrades each one
+local function StartAutoUpgrade()
+if Loops.auto_upgrade then return end
+Loops.auto_upgrade = true
+task.spawn(function()
+while Settings.auto_upgrade do
+local ok, placed = pcall(GetPlacedUnits)
+if ok and placed then
+for guid, unitData in pairs(placed) do
+if Settings.auto_upgrade then
+-- Check if unit still has upgrades available
+local unitId = tostring(unitData.Type)
+local upgradeLevel = 0
+local maxUpgrades = 0
+if unitData.Info and unitData.Info[unitId] then
+upgradeLevel = unitData.Info[unitId].Upgrade or 0
+if unitData.Info[unitId].Data and unitData.Info[unitId].Data.upgrades then
+maxUpgrades = #unitData.Info[unitId].Data.upgrades
+end
+end
+if upgradeLevel < maxUpgrades then
+pcall(UpgradeUnit, guid)
+task.wait(Settings.upgrade_delay)
+end
+end
+end
+end
+task.wait(1)
+end
+Loops.auto_upgrade = false
+end)
+end
+
+-- Auto Place: reads equipped units from inventory and places them on map spots
+-- Uses InventoryId as equipString, and finds open placement spots on the map
+local function StartAutoPlace()
+if Loops.auto_place then return end
+Loops.auto_place = true
+task.spawn(function()
+while Settings.auto_place do
+-- Get currently placed units to avoid re-placing
+local ok, placed = pcall(GetPlacedUnits)
+local placedCount = 0
+if ok and placed then
+for _ in pairs(placed) do placedCount = placedCount + 1 end
+end
+
+-- Get placement spots from workspace
+local spots = GetPlacementSpots()
+
+-- Get player's equipped inventory units via character/player data
+-- We use GetPlacedUnits data to know unit IDs already placed
+-- For placing new units, the user must have units in their equipped slots
+-- We attempt to place using known equipped unit data from existing placed units
+if ok and placed then
+local spotIndex = placedCount + 1
+for guid, unitData in pairs(placed) do
+-- Re-place logic: if a unit somehow isn't on map, fire PlaceUnit
+-- In APD, maxPlacements defines how many of a unit you can place
+local inventoryId = unitData.InventoryId
+local unitType = unitData.Type
+if inventoryId and unitType and spots[spotIndex] then
+pcall(PlaceUnit, unitType, spots[spotIndex], inventoryId)
+spotIndex = spotIndex + 1
+task.wait(Settings.place_delay)
+end
+end
+end
+task.wait(3)
+end
+Loops.auto_place = false
+end)
+end
+
+-- Auto Sell: sells all placed units once
+local function SellAllUnits()
+task.spawn(function()
+local ok, placed = pcall(GetPlacedUnits)
+if ok and placed then
+for guid, _ in pairs(placed) do
+pcall(SellUnit, guid)
+task.wait(0.3)
+end
+return true
+end
+return false
+end)
+end
+
+-- Auto Skip Wave loop
+local function StartAutoSkipWave()
+if Loops.auto_skip_wave then return end
+Loops.auto_skip_wave = true
+task.spawn(function()
+while Settings.auto_skip_wave do
+pcall(VoteSkipWave)
+task.wait(Settings.skip_delay)
+end
+Loops.auto_skip_wave = false
+end)
+end
+
+-- Auto Replay loop
+local function StartAutoReplay()
+if Loops.auto_replay then return end
+Loops.auto_replay = true
+task.spawn(function()
+while Settings.auto_replay do
+pcall(Replay)
+task.wait(5)
+end
+Loops.auto_replay = false
+end)
+end
+
+-- ================================================
+-- Rayfield UI
+-- ================================================
+local Rayfield = loadstring(game:HttpGet(
+'
+https://raw.githubusercontent.com/KarmaPanda/Roblox/refs/heads/main/rayfield.lua
+'))()
+
+local Window = Rayfield:CreateWindow({
+Name = "Anime Power Defense Script",
+LoadingTitle = "Anime Power Defense",
+LoadingSubtitle = "Auto Farm",
+LoadingVersion = "v1.1",
+ConfigurationSaving = { Enabled = false },
+KeySystem = false
+})
+
+-- ================================================
+-- TAB: Auto Farm
+-- ================================================
+local FarmTab = Window:CreateTab("Auto Farm", 4483362458)
+local FarmSection = FarmTab:CreateSection("Farm")
+
+FarmTab:CreateToggle({
+Name = "Auto Place Units",
+Info = "Automatically places your equipped units on available map spots.",
+CurrentValue = Settings.auto_place,
+Callback = function(value)
+Settings.auto_place = value
+Save()
+if value then StartAutoPlace() end
+end,
+SectionParent = FarmSection
+})
+
+FarmTab:CreateToggle({
+Name = "Auto Upgrade Units",
+Info = "Continuously upgrades all placed units to their max level.",
+CurrentValue = Settings.auto_upgrade,
+Callback = function(value)
+Settings.auto_upgrade = value
+Save()
+if value then StartAutoUpgrade() end
+end,
+SectionParent = FarmSection
+})
+
+FarmTab:CreateToggle({
+Name = "Auto Sell Units",
+Info = "Sells all placed units. Toggle on to sell, then it turns off.",
+CurrentValue = false,
+Callback = function(value)
+if value then
+SellAllUnits()
+task.wait(2)
+Settings.auto_sell = false
+Save()
+Rayfield:Notify({
+Title = "Auto Sell",
+Content = "All placed units sold!",
+Duration = 3,
+Image = 4483362458
+})
+end
+end,
+SectionParent = FarmSection
+})
+
+FarmTab:CreateButton({
+Name = "Sell All Units Now",
+Callback = function()
+SellAllUnits()
+Rayfield:Notify({
+Title = "Sell All",
+Content = "Selling all placed units...",
+Duration = 3,
+Image = 4483362458
+})
+end,
+SectionParent = FarmSection
+})
+
+-- ================================================
+-- TAB: Wave
+-- ================================================
+local WaveTab = Window:CreateTab("Wave", 4483362458)
+local WaveSection = WaveTab:CreateSection("Wave Control")
+
+WaveTab:CreateToggle({
+Name = "Auto Skip Wave",
+Info = "Votes to skip the wave every few seconds.",
+CurrentValue = Settings.auto_skip_wave,
+Callback = function(value)
+Settings.auto_skip_wave = value
+Save()
+if value then StartAutoSkipWave() end
+end,
+SectionParent = WaveSection
+})
+
+WaveTab:CreateSlider({
+Name = "Skip Interval (seconds)",
+Info = "How often to vote skip.",
+Range = {1, 10},
+Increment = 0.5,
+Suffix = "s",
+CurrentValue = Settings.skip_delay,
+Callback = function(value)
+Settings.skip_delay = value
+Save()
+end,
+SectionParent = WaveSection
+})
+
+WaveTab:CreateButton({
+Name = "Skip Wave Now",
+Callback = function()
+pcall(VoteSkipWave)
+Rayfield:Notify({
+Title = "Wave Skip",
+Content = "Vote skip sent!",
+Duration = 2,
+Image = 4483362458
+})
+end,
+SectionParent = WaveSection
+})
+
+local SpeedSection = WaveTab:CreateSection("Game Speed")
+
+WaveTab:CreateToggle({
+Name = "Auto Set Gamespeed",
+Info = "Sets gamespeed automatically on load.",
+CurrentValue = Settings.auto_gamespeed,
+Callback = function(value)
+Settings.auto_gamespeed = value
+Save()
+if value then pcall(SetGamespeed, Settings.gamespeed) end
+end,
+SectionParent = SpeedSection
+})
+
+WaveTab:CreateSlider({
+Name = "Gamespeed",
+Info = "1 = normal, 1.5 = fast, 2 = max.",
+Range = {1, 2},
+Increment = 0.5,
+Suffix = "x",
+CurrentValue = Settings.gamespeed,
+Callback = function(value)
+Settings.gamespeed = value
+Save()
+if Settings.auto_gamespeed then
+pcall(SetGamespeed, value)
+end
+end,
+SectionParent = SpeedSection
+})
+
+WaveTab:CreateButton({
+Name = "Set Speed Now",
+Callback = function()
+pcall(SetGamespeed, Settings.gamespeed)
+Rayfield:Notify({
+Title = "Gamespeed",
+Content = "Speed set to " .. Settings.gamespeed .. "x",
+Duration = 2,
+Image = 4483362458
+})
+end,
+SectionParent = SpeedSection
+})
+
+-- ================================================
+-- TAB: Replay
+-- ================================================
+local ReplayTab = Window:CreateTab("Replay", 4483362458)
+local ReplaySection = ReplayTab:CreateSection("Auto Replay")
+
+ReplayTab:CreateToggle({
+Name = "Auto Replay",
+Info = "Automatically retries the game after it ends.",
+CurrentValue = Settings.auto_replay,
+Callback = function(value)
+Settings.auto_replay = value
+Save()
+if value then StartAutoReplay() end
+end,
+SectionParent = ReplaySection
+})
+
+ReplayTab:CreateButton({
+Name = "Replay Now",
+Callback = function()
+pcall(Replay)
+Rayfield:Notify({
+Title = "Replay",
+Content = "Retry fired!",
+Duration = 2,
+Image = 4483362458
+})
+end,
+SectionParent = ReplaySection
+})
+
+-- ================================================
+-- TAB: Settings
+-- ================================================
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+local DelaySection = SettingsTab:CreateSection("Delays")
+
+SettingsTab:CreateSlider({
+Name = "Upgrade Delay (s)",
+Info = "Time between each upgrade fire.",
+Range = {0.1, 5},
+Increment = 0.1,
+Suffix = "s",
+CurrentValue = Settings.upgrade_delay,
+Callback = function(value)
+Settings.upgrade_delay = value
+Save()
+end,
+SectionParent = DelaySection
+})
+
+SettingsTab:CreateSlider({
+Name = "Place Delay (s)",
+Info = "Time between placing each unit.",
+Range = {0.1, 5},
+Increment = 0.1,
+Suffix = "s",
+CurrentValue = Settings.place_delay,
+Callback = function(value)
+Settings.place_delay = value
+Save()
+end,
+SectionParent = DelaySection
+})
+
+local MiscSection = SettingsTab:CreateSection("Misc")
+
+SettingsTab:CreateToggle({
+Name = "Auto Execute",
+Info = "Re-runs this script automatically on teleport.",
+CurrentValue = Settings.auto_execute,
+Callback = function(value)
+Settings.auto_execute = value
+Save()
+if value and not _G.apd_auto_executed then
+_G.apd_auto_executed = true
+-- Replace the URL below with wherever you host this script
+queue_on_teleport(game:HttpGet("YOUR_SCRIPT_URL_HERE"))
+end
+end,
+SectionParent = MiscSection
+})
+
+SettingsTab:CreateButton({
+Name = "Reset to Defaults",
+Callback = function()
+for k, v in pairs(DefaultSettings) do Settings[k] = v end
+Save()
+Rayfield:Notify({
+Title = "Reset",
+Content = "Settings restored to default!",
+Duration = 3,
+Image = 4483362458
+})
+end,
+SectionParent = MiscSection
+})
+
+-- ================================================
+-- TAB: Credits
+-- ================================================
+local CreditsTab = Window:CreateTab("Credits", 4483362458)
+local CreditsSection = CreditsTab:CreateSection("Credits")
+CreditsTab:CreateParagraph({
+Title = "Anime Power Defense Script v1.1",
+Content = "Remote paths reverse engineered via remote spy on GameId 5787561793. Built using KarmaPanda's Rayfield UI framework. Unit data structure sourced from GetPlacedUnits return values.",
+SectionParent = CreditsSection
+})
+
+-- ================================================
+-- Apply settings on load
+-- ================================================
+task.spawn(function()
+task.wait(2)
+if Settings.auto_gamespeed then
+pcall(SetGamespeed, Settings.gamespeed)
+end
+if Settings.auto_skip_wave then StartAutoSkipWave() end
+if Settings.auto_upgrade then StartAutoUpgrade() end
+if Settings.auto_place then StartAutoPlace() end
+if Settings.auto_replay then StartAutoReplay() end
+end)
+
+print("[APD Script] v1.1 loaded successfully!")
+EOF
+Output
+
+exit code 0

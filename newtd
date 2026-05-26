@@ -1,0 +1,147 @@
+-- Anime Tower Defense Macro
+-- Place in: StarterPlayerScripts > LocalScript
+
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- ============ SETTINGS ============
+local DELAY = 0.3        -- seconds between actions
+local REPEAT_MODE = "once"  -- "once", "loop", or "n"
+local REPEAT_N = 5          -- used if REPEAT_MODE = "n"
+-- ==================================
+
+local macroActions = {}
+local isRecording = false
+local isPlaying = false
+local playCoroutine = nil
+
+-- Labels for common ATD keys (optional, cosmetic)
+local keyLabels = {
+    Q = "Place Tower",
+    E = "Upgrade Tower",
+    R = "Sell Tower",
+    F = "Activate Special",
+    G = "Summon Unit",
+    ["1"] = "Ability 1",
+    ["2"] = "Ability 2",
+    ["3"] = "Ability 3",
+    T = "Auto-Farm",
+    M = "Map View",
+}
+
+-- Simulate a key press (fires any LocalScript listeners watching UIS)
+local function pressKey(keyCode)
+    -- This fires BindableEvents/functions that watch input
+    -- For actual in-game actions, hook this to your tower placement functions
+    print("[ATD Macro] Pressing: " .. tostring(keyCode))
+    -- Example: fire your own BindableEvent here
+    -- myEvent:Fire(keyCode)
+end
+
+local function waitSeconds(s)
+    local t = tick()
+    repeat RunService.Heartbeat:Wait() until tick() - t >= s
+end
+
+-- ============ RECORD ============
+local function startRecording()
+    macroActions = {}
+    isRecording = true
+    print("[ATD Macro] Recording started... Press F6 to stop.")
+end
+
+local function stopRecording()
+    isRecording = false
+    print("[ATD Macro] Recording stopped. " .. #macroActions .. " actions captured.")
+    for i, a in ipairs(macroActions) do
+        print(string.format("  [%d] Key: %s | Delay: %.2fs | %s", i, tostring(a.key), a.delay, a.label))
+    end
+end
+
+-- ============ PLAY ============
+local function runMacro()
+    isPlaying = true
+    print("[ATD Macro] Playback started.")
+
+    local function executeOnce()
+        for i, action in ipairs(macroActions) do
+            if not isPlaying then break end
+            print(string.format("[ATD Macro] [%d/%d] %s", i, #macroActions, action.label))
+            pressKey(action.key)
+            waitSeconds(action.delay)
+        end
+    end
+
+    if REPEAT_MODE == "loop" then
+        while isPlaying do
+            executeOnce()
+        end
+    elseif REPEAT_MODE == "n" then
+        for i = 1, REPEAT_N do
+            if not isPlaying then break end
+            print("[ATD Macro] Loop " .. i .. "/" .. REPEAT_N)
+            executeOnce()
+        end
+    else
+        executeOnce()
+    end
+
+    isPlaying = false
+    print("[ATD Macro] Playback finished.")
+end
+
+local function startPlay()
+    if #macroActions == 0 then
+        print("[ATD Macro] No actions recorded!")
+        return
+    end
+    if isPlaying then return end
+    playCoroutine = coroutine.create(runMacro)
+    coroutine.resume(playCoroutine)
+end
+
+local function stopPlay()
+    isPlaying = false
+    print("[ATD Macro] Playback stopped.")
+end
+
+-- ============ HOTKEYS ============
+-- F6 = toggle record
+-- F7 = play
+-- F8 = stop
+
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    -- Record actions while recording (ignore hotkeys themselves)
+    if isRecording then
+        local ignore = {
+            [Enum.KeyCode.F6] = true,
+            [Enum.KeyCode.F7] = true,
+            [Enum.KeyCode.F8] = true,
+        }
+        if not ignore[input.KeyCode] and input.UserInputType == Enum.UserInputType.Keyboard then
+            local keyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
+            table.insert(macroActions, {
+                key = input.KeyCode,
+                keyName = keyName,
+                label = keyLabels[keyName] or ("Key " .. keyName),
+                delay = DELAY,
+            })
+            print("[ATD Macro] Captured: " .. keyName)
+        end
+    end
+
+    -- Hotkeys
+    if input.KeyCode == Enum.KeyCode.F6 then
+        if isRecording then stopRecording() else startRecording() end
+    end
+
+    if input.KeyCode == Enum.KeyCode.F7 then
+        startPlay()
+    end
+
+    if input.KeyCode == Enum.KeyCode.F8 then
+        stopPlay()
+    end
+end)
+
+print("[ATD Macro] Loaded! F6=Record  F7=Play  F8=Stop")
